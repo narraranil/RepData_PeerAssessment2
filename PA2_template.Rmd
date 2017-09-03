@@ -1,0 +1,122 @@
+---
+title: "Peer Graded Assignment: Course Project 2 - Population Health and Economic Effects of Weather Events"
+author: "Ranil"
+date: "September 3, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+options(scipen = 1)   # Turn off scientific notations for numbers
+library(grid)
+library(ggplot2)
+library(plyr)
+require(gridExtra)
+```
+
+## Synopsis
+
+stroms and other severe weather events can cause both public health and economic problems for communities and municipalities. Many severe events can result in fatalities, injuries, and property damage, and preventing such outcomes to the extent possible is a key concern. This project involves exploring the U.S. National Oceanic and Atmospheric Administration's (NOAA) strom database, you can find it here <https://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FstromData.csv.bz2>. 
+
+This database tracks characteristics of major stroms and weather events in the United States, including when and where they occur, as well as estimates of any fatalities, injuries, and property damage. 
+
+## Objective
+The basic goal of this assignment is to explore the NOAA strom Database and answer some basic questions about severe weather events. Must use the database to answer the questions below and show the code for your entire analysis. 
+
+Analysis will address address the following questions:
+
+1. Across the United States, which types of events (as indicated in the EVTYPE variable) are most harmful with respect to population health?
+2. Across the United States, which types of events have the greatest economic consequences?
+
+## Data Processing
+
+We will set the work directory to download the file and save it. Program will read the generated csv file. If the data already exists in the working environment, we do not need to load it again. Otherwise, we read the csv file.
+
+```{r}
+
+setwd("C:\\Users\\narra\\Documents\\GitHub\\RepData_PeerAssessment2")
+
+if (!"RepDatastromData.csv.bz2" %in% dir("./")) {
+    print("Downloading File.....")
+    download.file("http://d396qusza40orc.cloudfront.net/repdata%2Fdata%2FstromData.csv.bz2", destfile = "RepDatastromData.csv.bz2")
+}
+if (!"strom" %in% ls()) {
+strom <- read.csv(bzfile("RepDatastromData.csv.bz2"), sep = ",", header = TRUE, stringsAsFactors = FALSE)
+}
+dim(strom)
+```
+
+### Changing invalid PROPstromEXP and CROPstromEXP to 0
+```{r}
+strom$PROPDMGEXP <- ifelse(strom$PROPDMGEXP %in% c("B", "h", "H", "K", "m", "M"),  as.character(strom$PROPDMGEXP), "NONE")
+strom$CROPDMGEXP <- ifelse(strom$CROPDMGEXP %in% c("B", "k", "K", "m", "M"),  as.character(strom$CROPDMGEXP), "NONE")
+```
+
+### Multiplying PROPstrom by factor of 10 based on EXP letter
+```{r}
+strom$PROPDMG <- strom$PROPDMG * (10^9 * (strom$PROPDMGEXP == "B") + 10^6 *(strom$PROPDMGEXP %in% c("m", "M")) + 10^3 * (strom$PROPDMGEXP %in% c("k", "K")) + 100 * (strom$PROPDMGEXP %in% c("h", "H")))
+
+strom$CROPDMG <- strom$CROPDMG * (10^9 * (strom$CROPDMGEXP == "B") + 10^6 *(strom$CROPDMGEXP %in% c("m", "M")) + 10^3 * (strom$CROPDMGEXP %in% c("k", "K")) + 100 * (strom$CROPDMGEXP %in% c("h", "H")))
+
+strom$TOTECODMG <- strom$PROPDMG+strom$CROPDMG
+```
+
+### Calculation: To find most harmful with respect to population health
+```{r}
+fatalities <- aggregate(FATALITIES ~ EVTYPE, data = strom, FUN = sum)
+fatalities <- fatalities[order(fatalities$FATALITIES, decreasing = TRUE), ]
+# 10 most harmful causes of fatalities
+MaxFatalities <- fatalities[1:10, ]
+print(MaxFatalities)  
+
+injuries <- aggregate(INJURIES ~ EVTYPE, data = strom, FUN = sum)
+injuries <- injuries[order(injuries$INJURIES, decreasing = TRUE), ]
+# 10 most harmful causes of injuries
+MaxInjuries <- injuries[1:10, ]
+print(MaxInjuries)
+
+```
+```{r}
+propdmg <- aggregate(PROPDMG ~ EVTYPE, data = strom, FUN = sum)
+propdmg <- propdmg[order(propdmg$PROPDMG, decreasing = TRUE), ]
+# 5 most harmful causes of Properties Damange
+propdmgMax <- propdmg[1:10, ]
+print(propdmgMax)
+
+cropdmg <- aggregate(CROPDMG ~ EVTYPE, data = strom, FUN = sum)
+cropdmg <- cropdmg[order(cropdmg$CROPDMG, decreasing = TRUE), ]
+# 5 most harmful causes of injuries
+cropdmgMax <- cropdmg[1:10, ]
+print(cropdmgMax)
+
+ecodmg <- aggregate(TOTECODMG ~ EVTYPE, data = strom, FUN = sum)
+ecodmg <- ecodmg[order(ecodmg$TOTECODMG, decreasing = TRUE), ]
+# 5 most harmful causes of property damage
+ecodmgMax <- ecodmg[1:10, ]
+print(ecodmgMax)
+
+
+```
+## Results
+
+### Question 01 : Across the United States, which types of events (as indicated in the EVTYPE variable) are most harmful with respect to population health?
+the following is a pair of graphs of Total Fatalities and Total Injuries caused by these Severe Weather Events.
+
+
+```{r pressure, echo=FALSE}
+par(mfrow = c(1, 2), mar = c(15, 4, 3, 2), mgp = c(3, 1, 0), cex = 0.8)
+barplot(MaxFatalities$FATALITIES, las = 3, names.arg = MaxFatalities$EVTYPE, main = "Weather Events With\n The Top 10 Highest Fatalities", ylab = "Number of Fatalities", col = "tomato3")
+barplot(MaxInjuries$INJURIES, las = 3, names.arg = MaxInjuries$EVTYPE, main = "Weather Events With\n The Top 10 Highest Injuries", ylab = "Number of Injuries", col = "gold1")
+```
+
+###Question 02 : Across the United States, which types of events have the greatest economic consequences?
+
+```{r}
+par(mfrow = c(1, 3), mar = c(15, 4, 3, 2), mgp = c(3, 1, 0), cex = 0.8)
+barplot(propdmgMax$PROPDMG/(10^9), las = 3, names.arg = propdmgMax$EVTYPE, main = "Top 10 Events with\n Greatest Property Damages", ylab = "Cost of damages ($ billions)", col = "lightblue1")
+barplot(cropdmgMax$CROPDMG/(10^9), las = 3, names.arg = cropdmgMax$EVTYPE, main = "Top 10 Events With\n Greatest Crop Damages", ylab = "Cost of damages ($ billions)", col = "yellow")
+barplot(ecodmgMax$TOTECODMG/(10^9), las = 3, names.arg = ecodmgMax$EVTYPE, main = "Top 10 Events With\n Greatest Economic Damages", ylab = "Cost of damages ($ billions)", col = "plum3")
+```
+
+## Conclusion
+The weather event most harmful to population health is tornado, which causes by far the most fatalities overall and per event. Tornadoes were also caused the most total injuries. Heat wave another event the causes many injuries per event. Total cost of damages highest for floods, but tornadoes and thunderstorm wind and hail was very costly per individual event.
